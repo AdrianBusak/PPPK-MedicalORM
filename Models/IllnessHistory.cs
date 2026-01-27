@@ -15,7 +15,7 @@ namespace Models
 
         [Column(Name = "doctor_id")]
         [ForeignKey("doctors")]
-        public int? DoctorId { get; set; }
+        public int DoctorId { get; set; }
 
         [Column(Name = "illness_name", NotNull = true)]
         public string IllnessName { get; set; } = "";

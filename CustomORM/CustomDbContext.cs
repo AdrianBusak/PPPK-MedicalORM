@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Linq.Expressions;
+using System.Reflection;
 
 namespace CustomORM
 {
@@ -99,6 +100,26 @@ namespace CustomORM
         public bool Delete<T>(int id) where T : new()
         {
             return _executor.ExecuteDelete<T>(id);
+        }
+
+
+        public List<T> Where<T>(Expression<Func<T, bool>> predicate) where T : new()
+        {
+            try
+            {
+                var visitor = new SqlExpressionVisitor();
+                var (whereClause, parameters) = visitor.Translate(predicate.Body);
+
+                var (tableName, _) = TableMapper.GetTableSchema(typeof(T));
+                var sql = $"SELECT * FROM {tableName} WHERE {whereClause};";
+
+                return _executor.ExecuteQuery<T>(sql, parameters);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Where Error: {ex.Message}");
+                return new List<T>();
+            }
         }
     }
 }
