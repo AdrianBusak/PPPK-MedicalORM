@@ -121,5 +121,9 @@ namespace CustomORM
                 return new List<T>();
             }
         }
+        public QueryBuilder<T> Query<T>() where T : new()
+        {
+            return new QueryBuilder<T>(this);
+        }
     }
 }
