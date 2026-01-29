@@ -7,11 +7,14 @@ namespace CustomORM
     {
         private readonly string _connectionString;
         private readonly QueryExecutor _executor;
+        private readonly ChangeTracker _changeTracker;
+        private readonly Dictionary<object, Dictionary<string, object>> _trackedEntities = new();
 
         public CustomDbContext(string connectionString)
         {
             _connectionString = connectionString;
             _executor = new QueryExecutor(connectionString);
+            _changeTracker = new ChangeTracker(_executor);
         }
 
         public async Task InitializeDatabaseAsync(params Type[] entityTypes)
@@ -71,26 +74,47 @@ namespace CustomORM
             try
             {
                 var (tableName, _) = TableMapper.GetTableSchema(typeof(T));
-                var sql = $"SELECT * FROM {tableName} WHERE id = @id;";
-                var result = _executor.ExecuteQuery<T>(sql, new Dictionary<string, object> { { "@id", id } });
+                var sql = $"SELECT * FROM {tableName} WHERE id = {id};";
+
+                var result = _executor.ExecuteQuery<T>(sql, new Dictionary<string, object>());
 
                 if (result.Count > 0)
-                    return result[0];
-                else
-                    return default;
+                {
+                    var entity = result[0];
+                    _changeTracker.Track(entity);
+                    return entity;
+                }
+
+                return default;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"GetById Error: {ex.Message}");
                 return default;
             }
         }
 
         public List<T> GetAll<T>() where T : new()
         {
-            var (tableName, _) = TableMapper.GetTableSchema(typeof(T));
-            var sql = $"SELECT * FROM {tableName};";
-            return _executor.ExecuteQuery<T>(sql);
+            try
+            {
+                var (tableName, _) = TableMapper.GetTableSchema(typeof(T));
+                var sql = $"SELECT * FROM {tableName};";
+
+                var result = _executor.ExecuteQuery<T>(sql, new Dictionary<string, object>());
+
+                foreach (var entity in result)
+                    _changeTracker.Track(entity);
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"GetAll Error: {ex.Message}");
+                return new List<T>();
+            }
         }
+
 
         public bool Update<T>(T entity, int id) where T : new()
         {
@@ -125,5 +149,11 @@ namespace CustomORM
         {
             return new QueryBuilder<T>(this);
         }
+
+        public int SaveChanges()
+        {
+            return _changeTracker.SaveChanges();
+        }
+
     }
 }

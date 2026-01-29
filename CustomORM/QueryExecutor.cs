@@ -208,6 +208,32 @@ namespace CustomORM
                 return false;
             }
         }
+
+        public int ExecuteNonQuery(string sql, Dictionary<string, object> parameters = null)
+        {
+            try
+            {
+                using var conn = new NpgsqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new NpgsqlCommand(sql, conn);
+
+                if (parameters != null)
+                {
+                    foreach (var param in parameters)
+                    {
+                        cmd.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                    }
+                }
+
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ExecuteNonQuery Error: {ex.Message}");
+                return 0;
+            }
+        }
+
     }
 
     public static class NpgsqlDataReaderExtensions
