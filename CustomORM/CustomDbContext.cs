@@ -63,6 +63,30 @@ namespace CustomORM
             Console.WriteLine("Svi FK-ovi konfigurirani");
         }
 
+        public async Task InitializeDatabaseMigrationAsync(params Type[] entityTypes)
+        {
+            var engine = new AutoMigrationEngine(_connectionString);
+            await engine.MigrateAsync(entityTypes);
+        }
+
+        public async Task ShowMigrationsAsync()
+        {
+            var engine = new AutoMigrationEngine(_connectionString);
+            await engine.ShowMigrationsAsync();
+        }
+
+        public async Task RollbackLastMigrationAsync()
+        {
+            var engine = new AutoMigrationEngine(_connectionString);
+            await engine.RollbackLastAsync();
+        }
+        public async Task MigrateForwardAsync()
+        {
+            var engine = new AutoMigrationEngine(_connectionString);
+            await engine.MigrateForwardAsync();
+        }
+
+
 
         public int Create<T>(T entity) where T : new()
         {
