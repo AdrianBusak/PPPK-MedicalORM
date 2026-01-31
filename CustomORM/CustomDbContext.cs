@@ -88,7 +88,7 @@ namespace CustomORM
 
 
 
-        public int Create<T>(T entity) where T : new()
+        public int Create<T>(T entity) where T : class
         {
             return _executor.ExecuteInsert(entity);
         }
@@ -140,7 +140,7 @@ namespace CustomORM
         }
 
 
-        public bool Update<T>(T entity, int id) where T : new()
+        public bool Update<T>(T entity, int id) where T : class
         {
             return _executor.ExecuteUpdate(entity, id);
         }

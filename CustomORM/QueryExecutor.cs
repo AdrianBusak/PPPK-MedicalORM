@@ -85,13 +85,15 @@ namespace CustomORM
             return results;
         }
 
-        public int ExecuteInsert<T>(T entity) where T : new()
+        public int ExecuteInsert<T>(T entity) where T : class
         {
             try
             {
-                var (tableName, columns) = TableMapper.GetTableSchema(typeof(T));
-                var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                var tableType = typeof(T);
+                var tableAttr = tableType.GetCustomAttribute<TableAttribute>();
+                var tableName = tableAttr?.Name ?? tableType.Name.ToSnakeCase();
 
+                var properties = tableType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
                 var columnNames = new List<string>();
                 var paramNames = new List<string>();
                 var parameters = new Dictionary<string, object>();
@@ -103,6 +105,14 @@ namespace CustomORM
                         prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>))
                         continue;
 
+                    if (prop.PropertyType.IsClass &&
+                        prop.PropertyType != typeof(string) &&
+                        !prop.PropertyType.IsPrimitive &&
+                        prop.GetCustomAttribute<ColumnAttribute>() == null)
+                    {
+                        continue; 
+                    }
+
                     var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
                     var idAttr = prop.GetCustomAttribute<IdAttribute>();
 
@@ -112,23 +122,21 @@ namespace CustomORM
                     var colName = colAttr?.Name ?? prop.Name.ToSnakeCase();
                     var value = prop.GetValue(entity);
 
-                    columnNames.Add(colName);
+                    columnNames.Add($"\"{colName}\"");
                     var paramName = $"@p{paramIndex}";
                     paramNames.Add(paramName);
                     parameters[paramName] = value ?? DBNull.Value;
                     paramIndex++;
                 }
 
-                var sql = $"INSERT INTO {tableName} ({string.Join(", ", columnNames)}) VALUES ({string.Join(", ", paramNames)}) RETURNING id;";
+                var sql = $"INSERT INTO \"{tableName}\" ({string.Join(", ", columnNames)}) VALUES ({string.Join(", ", paramNames)}) RETURNING id;";
 
                 using var conn = new NpgsqlConnection(_connectionString);
                 conn.Open();
                 using var cmd = new NpgsqlCommand(sql, conn);
 
                 foreach (var param in parameters)
-                {
                     cmd.Parameters.AddWithValue(param.Key, param.Value);
-                }
 
                 var result = cmd.ExecuteScalar();
                 return result != null ? Convert.ToInt32(result) : 0;
@@ -141,33 +149,41 @@ namespace CustomORM
         }
 
 
-        public bool ExecuteUpdate<T>(T entity, int id) where T : new()
+        public bool ExecuteUpdate<T>(T entity, int id) where T : class
         {
             try
             {
-                var (tableName, columns) = TableMapper.GetTableSchema(typeof(T));
-                var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                var tableType = typeof(T);
+                var tableAttr = tableType.GetCustomAttribute<TableAttribute>();
+                var tableName = tableAttr?.Name ?? tableType.Name.ToSnakeCase();
 
+                var properties = tableType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
                 var setClause = new List<string>();
                 var parameters = new Dictionary<string, object>();
                 int paramIndex = 0;
 
                 foreach (var prop in properties)
                 {
-                    var idAttr = prop.GetCustomAttribute<IdAttribute>();
-                    if (idAttr != null) continue;
+                    if (prop.GetCustomAttribute<IdAttribute>() != null)
+                        continue;
+
+                    if (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>))
+                        continue;
 
                     var colAttr = prop.GetCustomAttribute<ColumnAttribute>();
                     var colName = colAttr?.Name ?? prop.Name.ToSnakeCase();
                     var value = prop.GetValue(entity);
 
                     var paramName = $"@p{paramIndex}";
-                    setClause.Add($"{colName} = {paramName}");
+                    setClause.Add($"\"{colName}\" = {paramName}");
                     parameters[paramName] = value ?? DBNull.Value;
                     paramIndex++;
                 }
 
-                var sql = $"UPDATE {tableName} SET {string.Join(", ", setClause)} WHERE id = @id;";
+                if (setClause.Count == 0)
+                    return false;
+
+                var sql = $"UPDATE \"{tableName}\" SET {string.Join(", ", setClause)} WHERE \"id\" = @id;";
                 parameters["@id"] = id;
 
                 using var conn = new NpgsqlConnection(_connectionString);
@@ -175,9 +191,7 @@ namespace CustomORM
                 using var cmd = new NpgsqlCommand(sql, conn);
 
                 foreach (var param in parameters)
-                {
                     cmd.Parameters.AddWithValue(param.Key, param.Value);
-                }
 
                 return cmd.ExecuteNonQuery() > 0;
             }

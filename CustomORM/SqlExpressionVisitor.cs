@@ -75,7 +75,7 @@ namespace CustomORM
                 if (prop.PropertyType.IsGenericType &&
                     prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>))
                 {
-                    throw new NotSupportedException($"Navigacijska svojstva nisu podržana u Where klauzuli");
+                    throw new NotSupportedException($"Navigacijska svojstva nisu podržana u Where-u");
                 }
             }
 
@@ -97,7 +97,6 @@ namespace CustomORM
                 var paramName = $"@p{_paramCounter++}";
                 _sql.Append(paramName);
 
-                // Za sve tipove, uključujući DateTime
                 _parameters.Add((paramName, node.Value));
             }
             return node;
